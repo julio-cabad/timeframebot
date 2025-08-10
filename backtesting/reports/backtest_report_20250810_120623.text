@@ -1,0 +1,75 @@
+================================================================================
+                    REPORTE DE BACKTESTING
+================================================================================
+
+📊 RESUMEN EJECUTIVO
+----------------------------------------
+Período Analizado:      2025-06-13 a 2025-08-10
+Capital Inicial:        $200.00
+Balance Final:          $209.09
+Ganancia/Pérdida:       $9.09
+ROI:                    4.54%
+Calificación:           ⭐⭐ REGULAR - Revisar estrategia
+
+📈 ESTADÍSTICAS DE TRADING
+----------------------------------------
+Total de Trades:        90
+Trades Ganadores:       31 (34.4%)
+Trades Perdedores:      59
+Profit Factor:          1.28
+Ganancia Promedio:      $1.36
+Pérdida Promedio:       $0.56
+
+🛡️ GESTIÓN DE RIESGO
+----------------------------------------
+Max Drawdown:           4.78%
+Balance Máximo:         $211.88
+Balance Mínimo:         $199.82
+
+💰 COSTOS DE OPERACIÓN
+----------------------------------------
+Comisiones Totales:     $3.71
+% de Ganancias:         40.9%
+
+⚙️ CONFIGURACIÓN DEL BACKTEST
+----------------------------------------
+Símbolos:               BTCUSDT, ETHUSDT, SOLUSDT, ADAUSDT, TIAUSDT, BNBUSDT
+Timeframes:             1d, 4h, 1h, 15m
+Velas analizadas:       1500
+Score mínimo entrada:   65.0
+Stop Loss:              2.0%
+Take Profit:            6.0%
+Tamaño posición:        10.0%
+Max trades simultáneos: 5
+
+⏱️ DETALLES DE EJECUCIÓN
+----------------------------------------
+Señales generadas:      5752
+Tiempo de ejecución:    79.1 segundos
+
+🏆 TOP 5 MEJORES TRADES
+----------------------------------------
+  ADAUSDT: $1.77 (8.8%)
+  ADAUSDT: $1.70 (8.3%)
+  SOLUSDT: $1.69 (8.3%)
+  ETHUSDT: $1.56 (7.7%)
+  ADAUSDT: $1.54 (7.6%)
+
+📉 TOP 5 PEORES TRADES
+----------------------------------------
+  SOLUSDT: $-0.94 (-4.4%)
+  SOLUSDT: $-0.90 (-4.3%)
+  TIAUSDT: $-0.90 (-4.3%)
+  SOLUSDT: $-0.82 (-3.9%)
+  SOLUSDT: $-0.80 (-3.8%)
+
+💡 RECOMENDACIONES
+----------------------------------------
+• Win rate muy bajo - Revisar condiciones de entrada
+• Aumentar ratio reward/risk o mejorar win rate
+• ROI bajo - Optimizar puntos de entrada/salida
+
+================================================================================
+Reporte generado: 2025-08-10 12:06:23
+Por: Sistema de Trading Algorítmico v1.0
+================================================================================

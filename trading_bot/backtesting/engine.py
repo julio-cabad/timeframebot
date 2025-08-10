@@ -30,7 +30,7 @@ from .reporter import BacktestReporter
 
 from ..data.fetcher import MultiTimeframeFetcher
 from ..analysis.tf_analyzers import create_analyzer
-from ..analysis.confluence import ConfluenceAnalyzer
+from ..analysis.confluence import ConfluenceEngine as ConfluenceAnalyzer, analyze_confluence
 from ..analysis.patterns import PatternDetector
 from ..scoring.scorer import DynamicScorer
 
@@ -327,9 +327,7 @@ class BacktestEngine:
                 return False
             
             # 2. Analizar confluencia
-            confluence_result = self.confluence_analyzer.analyze_confluence(
-                mtf_analyses, symbol
-            )
+            confluence_result = analyze_confluence(mtf_analyses)
             
             # 3. Detectar patrones (simplificado para backtest)
             detected_patterns = []  # Por ahora sin detección de patrones

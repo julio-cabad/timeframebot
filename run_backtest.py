@@ -61,14 +61,14 @@ async def main():
         max_trades=3,  # Máximo 3 trades simultáneos
         
         # Datos
-        candles_to_fetch=500,  # Últimas 500 velas
+        candles_to_fetch=1500,  # Últimas 1500 velas como cuando funcionaba
         warmup_candles=100,  # 100 velas para calentar indicadores
         
         # Timeframes (orden importante: mayor a menor)
         timeframes=['1d', '4h', '1h', '15m'],
         
-        # Símbolos a testear (empezar con BTC)
-        symbols=['BTCUSDT']
+        # Símbolos a testear (los mismos que funcionaban)
+        symbols=['BTCUSDT', 'ETHUSDT']
     )
     
     print("\n⚙️ Configuración:")

@@ -1,0 +1,70 @@
+================================================================================
+                    REPORTE DE BACKTESTING
+================================================================================
+
+📊 RESUMEN EJECUTIVO
+----------------------------------------
+Período Analizado:      2025-07-25 a 2025-08-10
+Capital Inicial:        $200.00
+Balance Final:          $199.09
+Ganancia/Pérdida:       $-0.91
+ROI:                    -0.45%
+Calificación:           ⭐ POBRE - No recomendada
+
+📈 ESTADÍSTICAS DE TRADING
+----------------------------------------
+Total de Trades:        3
+Trades Ganadores:       0 (0.0%)
+Trades Perdedores:      2
+Profit Factor:          0.00
+Ganancia Promedio:      $0.00
+Pérdida Promedio:       $0.45
+
+🛡️ GESTIÓN DE RIESGO
+----------------------------------------
+Max Drawdown:           0.87%
+Balance Máximo:         $200.37
+Balance Mínimo:         $198.63
+
+💰 COSTOS DE OPERACIÓN
+----------------------------------------
+Comisiones Totales:     $0.10
+% de Ganancias:         10.9%
+
+⚙️ CONFIGURACIÓN DEL BACKTEST
+----------------------------------------
+Símbolos:               BTCUSDT
+Timeframes:             1d, 4h, 1h, 15m
+Velas analizadas:       500
+Score mínimo entrada:   20.0
+Stop Loss:              2.0%
+Take Profit:            6.0%
+Tamaño posición:        10.0%
+Max trades simultáneos: 5
+
+⏱️ DETALLES DE EJECUCIÓN
+----------------------------------------
+Señales generadas:      3
+Tiempo de ejecución:    12.0 segundos
+
+🏆 TOP 5 MEJORES TRADES
+----------------------------------------
+  BTCUSDT: $-0.43 (-2.0%)
+  BTCUSDT: $-0.48 (-2.3%)
+
+📉 TOP 5 PEORES TRADES
+----------------------------------------
+  BTCUSDT: $-0.48 (-2.3%)
+  BTCUSDT: $-0.43 (-2.0%)
+
+💡 RECOMENDACIONES
+----------------------------------------
+• Win rate muy bajo - Revisar condiciones de entrada
+• Profit factor < 1 - La estrategia pierde dinero
+• Pocos trades - Aumentar período de backtest
+• ROI negativo - Revisar toda la estrategia
+
+================================================================================
+Reporte generado: 2025-08-10 11:48:53
+Por: Sistema de Trading Algorítmico v1.0
+================================================================================

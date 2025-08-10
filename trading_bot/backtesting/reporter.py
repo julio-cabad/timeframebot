@@ -91,6 +91,8 @@ class BacktestReporter:
         # Resumen Ejecutivo
         report.append("📊 RESUMEN EJECUTIVO")
         report.append("-" * 40)
+        if hasattr(result, 'analysis_period') and result.analysis_period:
+            report.append(f"Período Analizado:      {result.analysis_period['start_date'][:10]} a {result.analysis_period['end_date'][:10]}")
         report.append(f"Capital Inicial:        ${result.config.initial_capital:,.2f}")
         report.append(f"Balance Final:          ${stats['final_balance']:,.2f}")
         report.append(f"Ganancia/Pérdida:       ${stats['total_pnl']:,.2f}")
