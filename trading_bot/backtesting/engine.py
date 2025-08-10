@@ -377,13 +377,48 @@ class BacktestEngine:
         Ejecuta la entrada al mercado
         
         Como trader disciplinado, SIEMPRE uso stop loss y take profit
+        MEJORADO: Stop loss dinámico según volatilidad del activo
         """
-        # Calcular stop loss y take profit
-        stop_loss = entry_price * (1 - self.config.stop_loss_pct)
-        take_profit = entry_price * (1 + self.config.take_profit_pct)
+        # Stop Loss Dinámico según el tipo de activo
+        # Basado en análisis: altcoins necesitan más espacio que BTC/ETH
+        if symbol in ['BTCUSDT', 'ETHUSDT']:
+            # Majors: 3% stop loss (antes 2%)
+            dynamic_sl_pct = 0.03
+            dynamic_tp_pct = 0.09  # Mantenemos ratio 1:3
+        elif symbol in ['BNBUSDT', 'SOLUSDT']:
+            # Top 10 coins: 3.5% stop loss
+            dynamic_sl_pct = 0.035
+            dynamic_tp_pct = 0.105  # Mantenemos ratio 1:3
+        elif symbol in ['ADAUSDT']:
+            # Mid-cap altcoins: 4% stop loss
+            dynamic_sl_pct = 0.04
+            dynamic_tp_pct = 0.12  # Mantenemos ratio 1:3
+        elif symbol in ['DOGEUSDT', 'TIAUSDT']:
+            # High volatility altcoins: 4.5% stop loss
+            dynamic_sl_pct = 0.045
+            dynamic_tp_pct = 0.135  # Mantenemos ratio 1:3
+        else:
+            # Default para otros: 3.5%
+            dynamic_sl_pct = 0.035
+            dynamic_tp_pct = 0.105
         
-        # Calcular tamaño de posición
-        position_size = self.portfolio.current_balance * self.config.position_size_pct
+        # Calcular stop loss y take profit con valores dinámicos
+        stop_loss = entry_price * (1 - dynamic_sl_pct)
+        take_profit = entry_price * (1 + dynamic_tp_pct)
+        
+        # Ajustar tamaño de posición según volatilidad
+        # Mantener riesgo constante: más volatilidad = menor posición
+        base_position_pct = self.config.position_size_pct
+        
+        # Ajuste inverso a la volatilidad (más SL = menos posición)
+        volatility_adjustment = 0.03 / dynamic_sl_pct  # 3% como referencia base
+        adjusted_position_pct = base_position_pct * volatility_adjustment
+        
+        # Limitar entre 10% y 30% del capital
+        adjusted_position_pct = min(0.30, max(0.10, adjusted_position_pct))
+        
+        # Calcular tamaño de posición ajustado
+        position_size = self.portfolio.current_balance * adjusted_position_pct
         
         # Abrir trade (por ahora solo LONG)
         trade = self.portfolio.open_trade(
@@ -400,7 +435,9 @@ class BacktestEngine:
         if trade:
             self.logger.info(
                 f"✅ TRADE EJECUTADO: {trade.trade_id} {symbol} "
-                f"Entrada: ${entry_price:.2f} SL: ${stop_loss:.2f} TP: ${take_profit:.2f}"
+                f"Entrada: ${entry_price:.2f} SL: ${stop_loss:.2f} ({dynamic_sl_pct*100:.1f}%) "
+                f"TP: ${take_profit:.2f} ({dynamic_tp_pct*100:.1f}%) "
+                f"Posición: {adjusted_position_pct*100:.1f}%"
             )
     
     def _calculate_volatility(self, df: pd.DataFrame) -> float:

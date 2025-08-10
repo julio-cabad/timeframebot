@@ -52,8 +52,8 @@ async def main():
         position_size_pct=0.20,  # 20% por trade ($40)
         
         # Estrategia
-        min_score_entry=65.0,  # Score mínimo 65 (bajado de 70 para más oportunidades)
-        min_confidence=0.7,  # Confianza mínima 70% (para reducir trades)
+        min_score_entry=68.0,  # Score mínimo 68 (más selectivo para mejor calidad)
+        min_confidence=0.72,  # Confianza mínima 72% (filtrar mejor calidad)
         
         # Risk Management
         stop_loss_pct=0.02,  # 2% stop loss
