@@ -1,0 +1,74 @@
+================================================================================
+                    REPORTE DE BACKTESTING
+================================================================================
+
+📊 RESUMEN EJECUTIVO
+----------------------------------------
+Capital Inicial:        $200.00
+Balance Final:          $206.57
+Ganancia/Pérdida:       $6.57
+ROI:                    3.29%
+Calificación:           ⭐⭐ REGULAR - Revisar estrategia
+
+📈 ESTADÍSTICAS DE TRADING
+----------------------------------------
+Total de Trades:        54
+Trades Ganadores:       17 (31.5%)
+Trades Perdedores:      36
+Profit Factor:          1.16
+Ganancia Promedio:      $2.87
+Pérdida Promedio:       $1.17
+
+🛡️ GESTIÓN DE RIESGO
+----------------------------------------
+Max Drawdown:           8.21%
+Balance Máximo:         $221.09
+Balance Mínimo:         $198.33
+
+💰 COSTOS DE OPERACIÓN
+----------------------------------------
+Comisiones Totales:     $4.49
+% de Ganancias:         68.4%
+
+⚙️ CONFIGURACIÓN DEL BACKTEST
+----------------------------------------
+Símbolos:               BTCUSDT, ETHUSDT, SOLUSDT, ADAUSDT, TIAUSDT, BNBUSDT, DOGEUSDT
+Timeframes:             1d, 4h, 1h, 15m
+Velas analizadas:       1500
+Score mínimo entrada:   70.0
+Stop Loss:              2.0%
+Take Profit:            6.0%
+Tamaño posición:        20.0%
+Max trades simultáneos: 10
+
+⏱️ DETALLES DE EJECUCIÓN
+----------------------------------------
+Señales generadas:      8264
+Tiempo de ejecución:    166.4 segundos
+
+🏆 TOP 5 MEJORES TRADES
+----------------------------------------
+  TIAUSDT: $3.78 (9.2%)
+  DOGEUSDT: $3.56 (8.7%)
+  ETHUSDT: $3.11 (7.7%)
+  ETHUSDT: $3.08 (7.8%)
+  BNBUSDT: $3.04 (7.4%)
+
+📉 TOP 5 PEORES TRADES
+----------------------------------------
+  TIAUSDT: $-1.82 (-4.2%)
+  SOLUSDT: $-1.72 (-3.9%)
+  DOGEUSDT: $-1.71 (-4.0%)
+  DOGEUSDT: $-1.59 (-3.7%)
+  ADAUSDT: $-1.55 (-3.5%)
+
+💡 RECOMENDACIONES
+----------------------------------------
+• Win rate muy bajo - Revisar condiciones de entrada
+• Aumentar ratio reward/risk o mejorar win rate
+• ROI bajo - Optimizar puntos de entrada/salida
+
+================================================================================
+Reporte generado: 2025-08-10 16:18:45
+Por: Sistema de Trading Algorítmico v1.0
+================================================================================

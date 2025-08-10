@@ -49,16 +49,16 @@ async def main():
     config = BacktestConfig(
         # Capital
         initial_capital=200.0,  # $200 USD
-        position_size_pct=0.10,  # 10% por trade ($20)
+        position_size_pct=0.20,  # 20% por trade ($40)
         
         # Estrategia
-        min_score_entry=70.0,  # Solo entrar con score > 70
-        min_confidence=0.6,  # Confianza mínima 60%
+        min_score_entry=65.0,  # Score mínimo 65 (bajado de 70 para más oportunidades)
+        min_confidence=0.7,  # Confianza mínima 70% (para reducir trades)
         
         # Risk Management
         stop_loss_pct=0.02,  # 2% stop loss
         take_profit_pct=0.06,  # 6% take profit (3:1 ratio)
-        max_trades=3,  # Máximo 3 trades simultáneos
+        max_trades=10,  # Máximo 10 trades simultáneos (CAMBIADO DE 3 A 10)
         
         # Datos
         candles_to_fetch=1500,  # Últimas 1500 velas como cuando funcionaba
@@ -67,8 +67,8 @@ async def main():
         # Timeframes (orden importante: mayor a menor)
         timeframes=['1d', '4h', '1h', '15m'],
         
-        # Símbolos a testear (los mismos que funcionaban)
-        symbols=['BTCUSDT', 'ETHUSDT']
+        # Símbolos a testear (7 símbolos como cuando teníamos ROI 7.88%)
+        symbols=['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'TIAUSDT', 'BNBUSDT', 'DOGEUSDT']
     )
     
     print("\n⚙️ Configuración:")
