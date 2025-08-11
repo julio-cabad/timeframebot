@@ -1,0 +1,78 @@
+
+================================================================================
+                    REPORTE DETALLADO DE BACKTESTING
+================================================================================
+
+📊 ANÁLISIS DE PERFORMANCE COMPLETO
+----------------------------------------
+
+1. RETORNOS Y VOLATILIDAD
+   • Retorno Total:              0.00%
+   • Retorno Anualizado:         0.00%
+   • Volatilidad Anualizada:     0.00%
+   • Mejor Mes:                  0.00%
+   • Peor Mes:                   0.00%
+   • Meses Positivos:            0/3
+
+2. RATIOS DE PERFORMANCE
+   • Sharpe Ratio:               0.000
+   • Sortino Ratio:              inf
+   • Calmar Ratio:               0.000
+   • Information Ratio:          N/A
+
+3. ANÁLISIS DE RIESGO DETALLADO
+   • Maximum Drawdown:           0.00%
+   • Duración Max Drawdown:      0 días
+   • Drawdown Actual:            0.00%
+   • Value at Risk (95%):        0.00%
+   • Conditional VaR (95%):      0.00%
+   • Desviación Downside:        0.00%
+   • Desviación Upside:          0.00%
+   • Períodos de Drawdown:       0
+
+4. ESTADÍSTICAS DE TRADING DETALLADAS
+   • Total de Trades:            0
+   • Trades Ganadores:           0 (0.00%)
+   • Trades Perdedores:          0 (100.00%)
+   • Ganancia Bruta:             $0.00
+   • Pérdida Bruta:              $0.00
+   • Ganancia Neta:              $0.00
+   • Profit Factor:              0.000
+   • Ganancia Promedio:          $0.00
+   • Pérdida Promedio:           $0.00
+   • Mayor Ganancia:             $0.00
+   • Mayor Pérdida:              $0.00
+   • Ratio Reward/Risk:          0.00
+   • Expectancy:                 $0.00
+   • Max Wins Consecutivas:      0
+   • Max Losses Consecutivas:    0
+
+5. POSITION SIZING Y KELLY
+   • Kelly Criterion:            0.00%
+   • Kelly Recomendado:          0.00% (50% del Kelly)
+   • Tamaño Actual Usado:        20.00%
+
+
+💡 RECOMENDACIONES DETALLADAS
+----------------------------------------
+ANÁLISIS Y RECOMENDACIONES ESPECÍFICAS:
+
+1. WIN RATE BAJO (0.0%)
+   • Revisar condiciones de entrada - posiblemente muy agresivas
+   • Considerar filtros adicionales de calidad de señal
+   • Evaluar si el score mínimo es demasiado bajo
+
+2. PROFIT FACTOR SUBÓPTIMO (0.00)
+   • Target: >2.0 para sistemas robustos
+   • Revisar niveles de take profit - posiblemente muy conservadores
+   • Evaluar niveles de stop loss - posiblemente muy amplios
+
+5. EXPECTANCY NEGATIVA ($0.00)
+   • Sistema no rentable en su forma actual
+   • Requiere rediseño fundamental de la estrategia
+
+
+================================================================================
+Reporte generado: 2025-08-10 18:37:33
+Por: Sistema de Trading Algorítmico Avanzado
+================================================================================

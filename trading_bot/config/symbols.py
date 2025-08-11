@@ -47,7 +47,8 @@ class SymbolManager:
                 max_position_size=0.40,  # 40% max for BTC
                 correlation_group="crypto_major",
                 volatility_factor=1.0,
-                liquidity_score=1.0
+                liquidity_score=1.0,
+                active=True  # ✅ ACTIVO - Cambiar a False para desactivar
             ),
             "ETHUSDT": SymbolConfig(
                 symbol="ETHUSDT",
@@ -58,7 +59,8 @@ class SymbolManager:
                 max_position_size=0.35,  # 35% max for ETH
                 correlation_group="crypto_major",
                 volatility_factor=1.1,
-                liquidity_score=0.95
+                liquidity_score=0.95,
+                active=True  # ✅ ACTIVO - Cambiar a False para desactivar
             ),
             "ADAUSDT": SymbolConfig(
                 symbol="ADAUSDT",
@@ -69,7 +71,8 @@ class SymbolManager:
                 max_position_size=0.25,  # 25% max for altcoins
                 correlation_group="crypto_altcoin",
                 volatility_factor=1.3,
-                liquidity_score=0.8
+                liquidity_score=0.8,
+                active=False  # ❌ DESACTIVADO - Cambiar a True para activar
             ),
             "SOLUSDT": SymbolConfig(
                 symbol="SOLUSDT",
@@ -80,7 +83,8 @@ class SymbolManager:
                 max_position_size=0.25,
                 correlation_group="crypto_altcoin",
                 volatility_factor=1.4,
-                liquidity_score=0.85
+                liquidity_score=0.85,
+                active=False  # ❌ DESACTIVADO - Cambiar a True para activar
             ),
             "DOTUSDT": SymbolConfig(
                 symbol="DOTUSDT",
@@ -91,7 +95,45 @@ class SymbolManager:
                 max_position_size=0.25,
                 correlation_group="crypto_altcoin",
                 volatility_factor=1.2,
-                liquidity_score=0.75
+                liquidity_score=0.75,
+                active=False  # ❌ DESACTIVADO - Cambiar a True para activar
+            ),
+            # 🆕 AGREGAR NUEVOS SÍMBOLOS AQUÍ
+            "BNBUSDT": SymbolConfig(
+                symbol="BNBUSDT",
+                category=SymbolCategory.ALTCOIN,
+                min_notional=5.0,
+                tick_size=0.01,
+                step_size=0.001,
+                max_position_size=0.25,
+                correlation_group="crypto_altcoin",
+                volatility_factor=1.2,
+                liquidity_score=0.9,
+                active=False  # ❌ DESACTIVADO - Cambiar a True para activar
+            ),
+            "MATICUSDT": SymbolConfig(
+                symbol="MATICUSDT",
+                category=SymbolCategory.ALTCOIN,
+                min_notional=5.0,
+                tick_size=0.0001,
+                step_size=1.0,
+                max_position_size=0.25,
+                correlation_group="crypto_altcoin",
+                volatility_factor=1.5,
+                liquidity_score=0.8,
+                active=False  # ❌ DESACTIVADO - Cambiar a True para activar
+            ),
+            "AVAXUSDT": SymbolConfig(
+                symbol="AVAXUSDT",
+                category=SymbolCategory.ALTCOIN,
+                min_notional=5.0,
+                tick_size=0.001,
+                step_size=0.01,
+                max_position_size=0.25,
+                correlation_group="crypto_altcoin",
+                volatility_factor=1.3,
+                liquidity_score=0.8,
+                active=False  # ❌ DESACTIVADO - Cambiar a True para activar
             )
         }
     

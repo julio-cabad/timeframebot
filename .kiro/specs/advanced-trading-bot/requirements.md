@@ -132,7 +132,24 @@ Este documento define los requerimientos para un sistema de trading algorítmico
 6. WHEN scaling from $100 to $100,000+ THEN the system SHALL maintain the same risk principles
 7. WHEN multiple instances run THEN the system SHALL coordinate to prevent position limit breaches
 
-### Requirement 10: Reporting and Visualization
+### Requirement 10: Advanced Backtesting System
+
+**User Story:** As a trading system developer, I want a comprehensive backtesting framework that validates strategy performance across multiple market regimes, so that I can optimize parameters and ensure profitability before live trading.
+
+#### Acceptance Criteria
+
+1. WHEN backtesting Phase 1 (Basic) runs THEN the system SHALL use current scoring without LLM integration
+2. WHEN backtesting executes THEN it SHALL implement realistic slippage, commissions, and execution delays
+3. WHEN backtesting completes THEN it SHALL calculate Win Rate, Profit Factor, Max Drawdown, and ROI metrics
+4. WHEN backtesting validates with 6 months of data THEN it SHALL achieve minimum Win Rate > 60% and Profit Factor > 2.0
+5. WHEN backtesting Phase 2 (Advanced) runs THEN it SHALL integrate LLM for ambiguous decisions
+6. WHEN backtesting Phase 2 executes THEN it SHALL include complete risk management and advanced metrics (Sharpe, Calmar)
+7. WHEN backtesting Phase 2 validates THEN it SHALL test with multiple years across different market regimes
+8. WHEN parameter optimization runs THEN it SHALL prevent overfitting through walk-forward analysis
+9. WHEN backtesting identifies underperformance THEN it SHALL provide specific recommendations for improvement
+10. WHEN backtesting results show Win Rate < 50% THEN it SHALL flag strategy for major revision
+
+### Requirement 11: Reporting and Visualization
 
 **User Story:** As a trading system user, I want comprehensive reporting and visualization capabilities, so that I can understand system performance, analyze decisions, and make informed adjustments.
 

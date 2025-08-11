@@ -378,23 +378,115 @@ class LLMException(TradingBotException):
 - **Memory Usage**: Long-running performance monitoring
 - **Latency Testing**: Execution speed optimization
 
-### Backtesting Framework
+### Advanced Backtesting Framework
+
+#### Phase 1: Basic Backtesting (Current Implementation Enhancement)
 ```python
-class BacktestEngine:
-    def run_backtest(self, 
-                    start_date: datetime,
-                    end_date: datetime,
-                    symbols: List[str],
-                    config: TradingConfig) -> BacktestResult
+class BasicBacktestEngine:
+    def run_basic_backtest(self, 
+                          start_date: datetime,
+                          end_date: datetime,
+                          symbols: List[str],
+                          config: BacktestConfig) -> BasicBacktestResult
 
 @dataclass
-class BacktestResult:
+class BasicBacktestResult:
+    # Core Performance Metrics
     total_return: float
     profit_factor: float
     win_rate: float
     max_drawdown: float
+    roi: float
+    
+    # Trade Statistics
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    avg_win: float
+    avg_loss: float
+    
+    # Risk Metrics
     sharpe_ratio: float
+    calmar_ratio: float
+    max_consecutive_losses: int
+    
+    # Execution Metrics
+    total_commissions: float
+    total_slippage: float
+    avg_execution_time: float
+    
+    # Detailed Analysis
     trade_details: List[TradeRecord]
+    equity_curve: pd.DataFrame
+    monthly_returns: Dict[str, float]
+    symbol_performance: Dict[str, SymbolPerformance]
+```
+
+#### Phase 2: Advanced Backtesting (Post LLM Integration)
+```python
+class AdvancedBacktestEngine(BasicBacktestEngine):
+    def run_advanced_backtest(self, 
+                             config: AdvancedBacktestConfig) -> AdvancedBacktestResult
+
+@dataclass
+class AdvancedBacktestResult(BasicBacktestResult):
+    # LLM Integration Metrics
+    llm_calls_made: int
+    llm_total_cost: float
+    llm_value_added: float
+    llm_accuracy: float
+    
+    # Regime Analysis
+    regime_performance: Dict[MarketRegime, RegimePerformance]
+    regime_transitions: List[RegimeTransition]
+    
+    # Advanced Risk Metrics
+    var_95: float
+    cvar_95: float
+    kelly_criterion: float
+    information_ratio: float
+    
+    # Walk-Forward Analysis
+    walk_forward_results: List[WalkForwardPeriod]
+    parameter_stability: Dict[str, float]
+```
+
+#### Backtesting Configuration
+```python
+@dataclass
+class BacktestConfig:
+    # Time Period
+    start_date: datetime
+    end_date: datetime
+    symbols: List[str]
+    
+    # Capital Management
+    initial_capital: float = 100000.0
+    position_size_pct: float = 0.20  # 20% per position
+    max_positions: int = 10
+    
+    # Entry/Exit Rules
+    min_score_threshold: float = 68.0
+    stop_loss_pct: float = 0.02  # 2%
+    take_profit_pct: float = 0.06  # 6%
+    
+    # Execution Simulation
+    commission_rate: float = 0.001  # 0.1%
+    slippage_model: SlippageModel = SlippageModel.REALISTIC
+    execution_delay_ms: int = 100
+    
+    # Risk Management
+    max_daily_drawdown: float = 0.02
+    max_portfolio_heat: float = 0.06
+    
+    # Data Configuration
+    timeframes: List[str] = field(default_factory=lambda: ['1d', '4h', '1h', '15m'])
+    warmup_periods: int = 200
+    
+    # Performance Targets
+    target_win_rate: float = 0.60  # 60%
+    target_profit_factor: float = 2.0
+    target_sharpe: float = 1.5
 ```
 
 ### Test Data Management

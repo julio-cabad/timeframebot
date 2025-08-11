@@ -1,0 +1,57 @@
+
+================================================================================
+                    REPORTE EJECUTIVO DE BACKTESTING
+================================================================================
+
+📊 RESUMEN EJECUTIVO
+----------------------------------------
+Capital Inicial:        $200.00
+Balance Final:          $200.00
+Ganancia/Pérdida:       $0.00
+ROI:                    0.00%
+ROI Anualizado:         0.00%
+Calificación:           ⭐ POBRE - Rediseñar completamente
+
+📈 MÉTRICAS CLAVE
+----------------------------------------
+Win Rate:               0.0%
+Profit Factor:          0.00
+Sharpe Ratio:           0.00
+Calmar Ratio:           0.00
+Kelly Criterion:        0.0%
+
+🛡️ GESTIÓN DE RIESGO
+----------------------------------------
+Max Drawdown:           0.00%
+Duración Max DD:        0 días
+VaR (95%):             0.00%
+CVaR (95%):            0.00%
+
+💰 ESTADÍSTICAS DE TRADING
+----------------------------------------
+Total de Trades:        0
+Trades Ganadores:       0 (0.0%)
+Trades Perdedores:      0
+Ganancia Promedio:      $0.00
+Pérdida Promedio:       $0.00
+Expectancy:            $0.00
+
+⚙️ CONFIGURACIÓN UTILIZADA
+----------------------------------------
+Símbolos:               BTCUSDT, ETHUSDT
+Score Mínimo:           60.0
+Stop Loss:              2.0%
+Take Profit:            6.0%
+Tamaño Posición:        20.0%
+
+💡 RECOMENDACIONES RÁPIDAS
+----------------------------------------
+• Win rate bajo - Revisar condiciones de entrada
+• Profit factor bajo - Mejorar ratio reward/risk
+• Sharpe bajo - Optimizar risk-adjusted returns
+• Expectancy negativa - Sistema no rentable
+
+================================================================================
+Reporte generado: 2025-08-10 18:31:14
+Por: Sistema de Trading Algorítmico
+================================================================================

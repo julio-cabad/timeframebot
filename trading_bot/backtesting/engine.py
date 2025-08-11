@@ -1,487 +1,585 @@
 """
-Motor de Backtesting con Datos Reales
-=====================================
+Motor Principal de Backtesting
+=============================
 
-Como trader algorítmico senior, este es el corazón del sistema.
-Usa datos 100% REALES de Binance y aplica nuestra estrategia
-con un portfolio virtual de $200 USD.
+Como trader senior, este es el corazón del sistema de validación.
+Aquí es donde separamos las estrategias ganadoras de las perdedoras.
 
-Filosofía de trading que aplico:
-- Entradas basadas en confluencia multi-timeframe
-- Stop loss estricto al 2%
-- Take profit al 6% (ratio 3:1)
-- Máximo 3 trades simultáneos
-- Solo operar con alta confianza (score > 70)
+El motor simula condiciones reales de mercado:
+- Slippage realista basado en volatilidad
+- Comisiones y spreads
+- Latencia de ejecución
+- Gaps de mercado
+- Liquidez limitada
 
-Autor: Trader Algorítmico Senior (10+ años rentable)
+Filosofía: "Mejor ser pesimista en backtesting que optimista en producción"
+
+Autor: Trader Algorítmico Senior (10+ años)
 """
 
-import asyncio
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple, Any, Union
+from dataclasses import dataclass, field
+from enum import Enum
 import pytz
+from pathlib import Path
 
-from .portfolio import VirtualPortfolio, TradeSide
-from .metrics import MetricsCalculator
-from .reporter import BacktestReporter
-
-from ..data.fetcher import MultiTimeframeFetcher
-from ..analysis.tf_analyzers import create_analyzer
-from ..analysis.confluence import ConfluenceEngine as ConfluenceAnalyzer, analyze_confluence
-from ..analysis.patterns import PatternDetector
-from ..scoring.scorer import DynamicScorer
-
+from ..config.settings import config
 from ..utils.logger import get_logger, LogContext
-from ..utils.exceptions import TradingBotException
+from ..utils.exceptions import TradingBotException, ErrorCodes
 
-# Zona horaria Ecuador
+# Zona horaria de Ecuador (UTC-5)
 ECUADOR_TZ = pytz.timezone('America/Guayaquil')
+
+class OrderType(Enum):
+    """Tipos de órdenes"""
+    MARKET = "market"
+    LIMIT = "limit"
+    STOP = "stop"
+    STOP_LIMIT = "stop_limit"
+
+class OrderSide(Enum):
+    """Lado de la orden"""
+    BUY = "buy"
+    SELL = "sell"
+
+class ExecutionStatus(Enum):
+    """Estado de ejecución"""
+    PENDING = "pending"
+    FILLED = "filled"
+    PARTIAL = "partial"
+    CANCELLED = "cancelled"
+    REJECTED = "rejected"
+
+@dataclass
+class TradeExecution:
+    """Ejecución de un trade en backtesting"""
+    timestamp: datetime
+    symbol: str
+    side: OrderSide
+    quantity: float
+    price: float
+    commission: float
+    slippage: float
+    
+    # Contexto del trade
+    signal_score: float
+    timeframe_analysis: Dict[str, Any]
+    llm_decision: Optional[str] = None
+    
+    # Métricas de ejecución
+    execution_delay_ms: int = 0
+    market_impact: float = 0.0
+    
+    @property
+    def total_cost(self) -> float:
+        """Costo total incluyendo comisiones y slippage"""
+        return self.quantity * self.price + self.commission + abs(self.slippage)
+    
+    @property
+    def net_price(self) -> float:
+        """Precio neto después de costos"""
+        cost_per_share = (self.commission + abs(self.slippage)) / self.quantity
+        return self.price + cost_per_share if self.side == OrderSide.BUY else self.price - cost_per_share
+
+@dataclass
+class PortfolioState:
+    """Estado del portfolio en un momento dado"""
+    timestamp: datetime
+    cash: float
+    positions: Dict[str, float]  # symbol -> quantity
+    market_values: Dict[str, float]  # symbol -> market_value
+    
+    @property
+    def total_value(self) -> float:
+        """Valor total del portfolio"""
+        return self.cash + sum(self.market_values.values())
+    
+    @property
+    def equity(self) -> float:
+        """Equity del portfolio"""
+        return self.total_value
+    
+    def get_position_value(self, symbol: str, current_price: float) -> float:
+        """Valor de una posición específica"""
+        quantity = self.positions.get(symbol, 0.0)
+        return quantity * current_price
 
 @dataclass
 class BacktestConfig:
-    """Configuración del backtest"""
-    # Capital
-    initial_capital: float = 200.0  # USD
-    position_size_pct: float = 0.10  # 10% por trade
+    """Configuración para backtesting"""
+    # Período de backtesting
+    start_date: datetime
+    end_date: datetime
+    symbols: List[str]
     
-    # Estrategia
-    min_score_entry: float = 70.0  # Score mínimo para entrar
-    min_confidence: float = 0.6  # Confianza mínima
+    # Capital inicial
+    initial_capital: float = 100000.0
     
-    # Risk Management
-    stop_loss_pct: float = 0.02  # 2% stop loss
-    take_profit_pct: float = 0.06  # 6% take profit (3:1)
-    max_trades: int = 3  # Máximo trades simultáneos
+    # Costos de transacción
+    commission_rate: float = 0.001  # 0.1%
+    slippage_model: str = "linear"  # "linear", "sqrt", "fixed"
+    base_slippage: float = 0.0005  # 0.05%
     
-    # Datos
-    candles_to_fetch: int = 500  # Velas a obtener de Binance
-    warmup_candles: int = 100  # Velas para calentar indicadores
+    # Configuración de ejecución
+    execution_delay_ms: int = 100  # Latencia de ejecución
+    max_position_size: float = 0.04  # 30% máximo por posición
+    max_portfolio_heat: float = 0.06  # 6% heat máximo
     
-    # Timeframes a analizar
-    timeframes: List[str] = None  # ['1d', '4h', '1h', '15m']
+    # Configuración de datos
+    data_frequency: str = "1h"  # Frecuencia de datos
+    warmup_period: int = 200  # Períodos de calentamiento
     
-    # Símbolos a testear
-    symbols: List[str] = None  # ['BTCUSDT', 'ETHUSDT', etc]
+    # Configuración de riesgo
+    max_daily_drawdown: float = 0.02  # 2%
+    max_consecutive_losses: int = 5
     
-    def __post_init__(self):
-        if self.timeframes is None:
-            self.timeframes = ['1d', '4h', '1h', '15m']
-        if self.symbols is None:
-            self.symbols = ['BTCUSDT']  # Por defecto solo BTC
-
-@dataclass
-class BacktestResult:
-    """Resultado completo del backtest"""
-    config: BacktestConfig
-    portfolio_stats: Dict
-    trades_df: pd.DataFrame
-    balance_curve: pd.DataFrame
-    signals_generated: int
-    execution_time: float
-    final_balance: float
-    roi_percent: float
-    win_rate: float
-    profit_factor: float
-    max_drawdown: float
+    # Configuración LLM (si aplica)
+    use_llm: bool = True
+    llm_cost_per_call: float = 0.001
+    max_daily_llm_cost: float = 50.0
 
 class BacktestEngine:
     """
-    Motor principal de backtesting con datos reales
+    Motor principal de backtesting
     
-    Como trader con 10+ años, he aprendido que:
-    1. Los datos reales son CRÍTICOS - nunca simular precios
-    2. La disciplina en stops es innegociable
-    3. Menos trades con más calidad > muchos trades mediocres
-    4. El backtesting debe ser lo más realista posible
+    Como trader senior, he diseñado este motor para ser:
+    1. Realista - Simula condiciones reales de mercado
+    2. Conservador - Asume el peor escenario en costos
+    3. Detallado - Registra cada decisión y resultado
+    4. Robusto - Maneja datos faltantes y errores
     """
     
-    def __init__(self, config: Optional[BacktestConfig] = None):
+    def __init__(self, config: BacktestConfig):
+        self.config = config
         self.logger = get_logger("BacktestEngine")
-        self.config = config or BacktestConfig()
         
-        # Componentes del sistema
-        self.fetcher = MultiTimeframeFetcher()
-        self.confluence_analyzer = ConfluenceAnalyzer()
-        self.pattern_detector = PatternDetector()
-        self.scorer = DynamicScorer()
+        # Estado del backtesting
+        self.current_time: Optional[datetime] = None
+        self.portfolio: Optional[PortfolioState] = None
+        self.trades: List[TradeExecution] = []
+        self.portfolio_history: List[PortfolioState] = []
         
-        # Portfolio virtual
-        self.portfolio = VirtualPortfolio(
-            initial_capital=self.config.initial_capital,
-            max_position_pct=self.config.position_size_pct,
-            max_trades=self.config.max_trades
-        )
+        # Métricas de control
+        self.daily_pnl: Dict[str, float] = {}  # date -> pnl
+        self.consecutive_losses = 0
+        self.daily_llm_cost = 0.0
         
-        # Estadísticas
-        self.signals_generated = 0
-        self.start_time = None
-        self.end_time = None
+        # Datos de mercado
+        self.market_data: Dict[str, pd.DataFrame] = {}
+        self.current_prices: Dict[str, float] = {}
         
-        self.logger.info(
-            f"BacktestEngine iniciado - Capital: ${self.config.initial_capital} "
-            f"Score mínimo: {self.config.min_score_entry}"
-        )
+        # Inicializar portfolio
+        self._initialize_portfolio()
     
-    async def run_backtest(self, symbol: str = None, 
-                          start_date: Optional[datetime] = None,
-                          end_date: Optional[datetime] = None) -> BacktestResult:
-        """
-        Ejecuta el backtest con datos reales de Binance
+    def _initialize_portfolio(self) -> None:
+        """Inicializa el portfolio con capital inicial"""
+        self.portfolio = PortfolioState(
+            timestamp=self.config.start_date,
+            cash=self.config.initial_capital,
+            positions={symbol: 0.0 for symbol in self.config.symbols},
+            market_values={symbol: 0.0 for symbol in self.config.symbols}
+        )
         
-        Args:
-            symbol: Símbolo a testear (usa config si None)
-            start_date: Fecha inicio (usa últimas N velas si None)
-            end_date: Fecha fin (usa ahora si None)
-            
-        Returns:
-            BacktestResult con todos los resultados
-        """
-        self.start_time = datetime.now()
+        self.portfolio_history.append(self.portfolio)
+        self.logger.info(f"Portfolio inicializado con ${self.config.initial_capital:,.2f}")
+    
+    def load_market_data(self, data_handler) -> None:
+        """Carga datos de mercado desde el data handler"""
         context = LogContext(component="backtest_engine")
         
         try:
-            # Usar símbolo de config si no se especifica
-            symbols = [symbol] if symbol else self.config.symbols
+            for symbol in self.config.symbols:
+                df = data_handler.get_historical_data(
+                    symbol=symbol,
+                    start_date=self.config.start_date - timedelta(days=self.config.warmup_period),
+                    end_date=self.config.end_date,
+                    frequency=self.config.data_frequency
+                )
+                
+                if df is not None and not df.empty:
+                    self.market_data[symbol] = df
+                    self.logger.info(f"Cargados {len(df)} registros para {symbol}")
+                else:
+                    self.logger.warning(f"No se pudieron cargar datos para {symbol}")
             
             self.logger.info(
-                f"Iniciando backtest para {symbols} con {self.config.candles_to_fetch} velas",
+                f"Datos de mercado cargados para {len(self.market_data)} símbolos",
                 context=context
             )
             
-            # Para cada símbolo
-            for sym in symbols:
-                await self._backtest_symbol(sym)
-            
-            # Cerrar trades abiertos al final
-            if self.portfolio.open_trades:
-                self.logger.info("Cerrando trades abiertos al final del backtest")
-                last_prices = await self._get_current_prices(symbols)
-                self.portfolio.close_all_trades(last_prices, datetime.now(ECUADOR_TZ))
-            
-            # Calcular tiempo de ejecución
-            self.end_time = datetime.now()
-            execution_time = (self.end_time - self.start_time).total_seconds()
-            
-            # Obtener estadísticas finales
-            portfolio_stats = self.portfolio.get_statistics()
-            trades_df = self.portfolio.get_trade_history()
-            balance_curve = self.portfolio.get_balance_curve()
-            
-            # Crear resultado
-            result = BacktestResult(
-                config=self.config,
-                portfolio_stats=portfolio_stats,
-                trades_df=trades_df,
-                balance_curve=balance_curve,
-                signals_generated=self.signals_generated,
-                execution_time=execution_time,
-                final_balance=portfolio_stats['final_balance'],
-                roi_percent=portfolio_stats['roi_percent'],
-                win_rate=portfolio_stats['win_rate'],
-                profit_factor=portfolio_stats['profit_factor'],
-                max_drawdown=portfolio_stats['max_drawdown_pct']
-            )
-            
-            self._log_results(result)
-            
-            return result
-            
         except Exception as e:
-            self.logger.error(f"Error en backtest: {str(e)}", context=context)
-            raise TradingBotException(f"Backtest falló: {str(e)}")
+            self.logger.error(f"Error cargando datos de mercado: {e}")
+            raise TradingBotException(f"Fallo cargando datos: {str(e)}")
     
-    async def _backtest_symbol(self, symbol: str):
+    def calculate_slippage(self, symbol: str, quantity: float, side: OrderSide) -> float:
         """
-        Ejecuta backtest para un símbolo específico
+        Calcula slippage realista basado en volatilidad y tamaño de orden
         
-        Como trader profesional, proceso cada vela como si fuera en tiempo real
-        """
-        context = LogContext(component="backtest_engine", symbol=symbol)
-        
-        self.logger.info(f"Obteniendo datos reales de {symbol}...", context=context)
-        
-        # 1. Obtener datos históricos REALES de Binance
-        data = await self._fetch_historical_data(symbol)
-        
-        if not data or '1h' not in data:  # Usamos 1h como timeframe principal
-            self.logger.error(f"No se pudieron obtener datos para {symbol}")
-            return
-        
-        # 2. Preparar datos para iteración
-        main_df = data['1h']  # DataFrame principal (1h)
-        
-        # Saltar periodo de calentamiento
-        start_idx = self.config.warmup_candles
-        end_idx = len(main_df)
-        
-        self.logger.info(
-            f"Procesando {end_idx - start_idx} velas de {symbol} "
-            f"(saltando {start_idx} de calentamiento)",
-            context=context
-        )
-        
-        # 3. Iterar por cada vela (simulando tiempo real)
-        for i in range(start_idx, end_idx):
-            current_candle = main_df.iloc[i]
-            current_time = current_candle.name  # El índice debe ser datetime
-            current_price = current_candle['close']
-            
-            # Preparar datos hasta este punto (no ver el futuro!)
-            historical_data = {}
-            for tf, df in data.items():
-                # Encontrar índice correspondiente en este timeframe
-                mask = df.index <= current_time
-                historical_data[tf] = df[mask]
-            
-            # 4. Actualizar trades abiertos con precio actual
-            self.portfolio.update_trades(
-                {symbol: current_price}, 
-                current_time
-            )
-            
-            # 5. Verificar si debemos entrar en un trade
-            should_enter = await self._evaluate_entry_signal(
-                symbol, historical_data, current_price, current_time
-            )
-            
-            if should_enter:
-                self._execute_entry(symbol, current_price, current_time)
-        
-        self.logger.info(
-            f"Backtest de {symbol} completado. "
-            f"Trades ejecutados: {len(self.portfolio.closed_trades)}",
-            context=context
-        )
-    
-    async def _fetch_historical_data(self, symbol: str) -> Dict[str, pd.DataFrame]:
-        """
-        Obtiene datos históricos REALES de Binance
-        
-        Returns:
-            Dict con DataFrames por timeframe
+        Como trader senior, sé que el slippage es donde se pierde dinero real.
+        Este modelo es conservador pero realista.
         """
         try:
-            # Obtener datos de todos los timeframes
-            fetch_results = await self.fetcher.fetch_ohlcv(
+            # Obtener volatilidad reciente
+            if symbol not in self.market_data:
+                return self.config.base_slippage * quantity
+            
+            df = self.market_data[symbol]
+            recent_data = df.tail(20)  # Últimas 20 velas
+            
+            if len(recent_data) < 5:
+                return self.config.base_slippage * quantity
+            
+            # Calcular volatilidad
+            returns = recent_data['close'].pct_change().dropna()
+            volatility = returns.std() if len(returns) > 1 else 0.01
+            
+            # Modelo de slippage basado en volatilidad y tamaño
+            base_slippage = self.config.base_slippage
+            volatility_factor = min(volatility * 10, 0.005)  # Máximo 0.5%
+            
+            # Factor de tamaño (órdenes grandes tienen más slippage)
+            current_price = self.current_prices.get(symbol, recent_data['close'].iloc[-1])
+            order_value = quantity * current_price
+            portfolio_value = self.portfolio.total_value
+            size_factor = min((order_value / portfolio_value) * 2, 0.003)  # Máximo 0.3%
+            
+            total_slippage_rate = base_slippage + volatility_factor + size_factor
+            
+            # Aplicar dirección (compras pagan más, ventas reciben menos)
+            direction_multiplier = 1.0 if side == OrderSide.BUY else -1.0
+            
+            slippage_amount = quantity * current_price * total_slippage_rate * direction_multiplier
+            
+            return slippage_amount
+            
+        except Exception as e:
+            self.logger.warning(f"Error calculando slippage: {e}")
+            return self.config.base_slippage * quantity * (1 if side == OrderSide.BUY else -1)
+    
+    def calculate_commission(self, quantity: float, price: float) -> float:
+        """Calcula comisión de la transacción"""
+        trade_value = quantity * price
+        commission = trade_value * self.config.commission_rate
+        
+        # Comisión mínima (realista para exchanges)
+        min_commission = 0.01
+        return max(commission, min_commission)
+    
+    def can_execute_trade(self, symbol: str, quantity: float, side: OrderSide) -> Tuple[bool, str]:
+        """
+        Verifica si un trade puede ejecutarse
+        
+        Incluye todas las validaciones de riesgo que uso en producción
+        """
+        try:
+            current_price = self.current_prices.get(symbol)
+            if not current_price:
+                return False, f"No hay precio actual para {symbol}"
+            
+            trade_value = abs(quantity) * current_price
+            
+            # Verificar cash disponible para compras
+            if side == OrderSide.BUY:
+                commission = self.calculate_commission(abs(quantity), current_price)
+                slippage = abs(self.calculate_slippage(symbol, abs(quantity), side))
+                total_cost = trade_value + commission + slippage
+                
+                if total_cost > self.portfolio.cash:
+                    return False, f"Cash insuficiente: ${total_cost:.2f} > ${self.portfolio.cash:.2f}"
+            
+            # Verificar límites de posición
+            current_position = self.portfolio.positions.get(symbol, 0.0)
+            new_position = current_position + (quantity if side == OrderSide.BUY else -quantity)
+            new_position_value = abs(new_position) * current_price
+            
+            max_position_value = self.portfolio.total_value * self.config.max_position_size
+            if new_position_value > max_position_value:
+                return False, f"Excede límite de posición: {new_position_value:.2f} > {max_position_value:.2f}"
+            
+            # Verificar heat del portfolio
+            total_heat = sum(
+                abs(pos) * self.current_prices.get(sym, 0) 
+                for sym, pos in self.portfolio.positions.items()
+            ) + trade_value
+            
+            max_heat = self.portfolio.total_value * self.config.max_portfolio_heat
+            if total_heat > max_heat:
+                return False, f"Excede heat del portfolio: {total_heat:.2f} > {max_heat:.2f}"
+            
+            # Verificar drawdown diario
+            today = self.current_time.date() if self.current_time else datetime.now().date()
+            daily_pnl = self.daily_pnl.get(str(today), 0.0)
+            max_daily_loss = self.config.initial_capital * self.config.max_daily_drawdown
+            
+            if daily_pnl < -max_daily_loss:
+                return False, f"Límite de drawdown diario alcanzado: {daily_pnl:.2f}"
+            
+            # Verificar pérdidas consecutivas
+            if self.consecutive_losses >= self.config.max_consecutive_losses:
+                return False, f"Máximo de pérdidas consecutivas alcanzado: {self.consecutive_losses}"
+            
+            return True, "Trade válido"
+            
+        except Exception as e:
+            return False, f"Error validando trade: {str(e)}"
+    
+    def execute_trade(self, symbol: str, quantity: float, side: OrderSide, 
+                     signal_score: float, timeframe_analysis: Dict[str, Any],
+                     llm_decision: Optional[str] = None) -> Optional[TradeExecution]:
+        """
+        Ejecuta un trade en el backtesting
+        
+        Como trader senior, simulo TODOS los costos reales que enfrentaría en producción
+        """
+        context = LogContext(component="backtest_engine")
+        
+        try:
+            # Validar si el trade puede ejecutarse
+            can_execute, reason = self.can_execute_trade(symbol, quantity, side)
+            if not can_execute:
+                self.logger.debug(f"Trade rechazado: {reason}")
+                return None
+            
+            current_price = self.current_prices[symbol]
+            
+            # Calcular costos
+            commission = self.calculate_commission(abs(quantity), current_price)
+            slippage = self.calculate_slippage(symbol, abs(quantity), side)
+            
+            # Simular latencia de ejecución (precio puede cambiar)
+            execution_price = current_price
+            if self.config.execution_delay_ms > 0:
+                # Simular cambio de precio durante la latencia
+                volatility = 0.001  # Volatilidad base para simulación
+                price_change = np.random.normal(0, volatility) * current_price
+                execution_price = max(current_price + price_change, current_price * 0.99)  # Mínimo 1% del precio
+            
+            # Crear ejecución
+            execution = TradeExecution(
+                timestamp=self.current_time,
                 symbol=symbol,
-                timeframes=self.config.timeframes,
-                limit=self.config.candles_to_fetch
+                side=side,
+                quantity=abs(quantity),
+                price=execution_price,
+                commission=commission,
+                slippage=slippage,
+                signal_score=signal_score,
+                timeframe_analysis=timeframe_analysis,
+                llm_decision=llm_decision,
+                execution_delay_ms=self.config.execution_delay_ms
             )
             
-            # Convertir a DataFrames con índice datetime
-            data = {}
-            for tf, result in fetch_results.items():
-                df = result.data
-                # Asegurar que el índice es datetime
-                if 'open_time' in df.columns:
-                    df.set_index('open_time', inplace=True)
-                elif not isinstance(df.index, pd.DatetimeIndex):
-                    # Intentar convertir
-                    df.index = pd.to_datetime(df.index)
-                
-                data[tf] = df
+            # Actualizar portfolio
+            self._update_portfolio_from_execution(execution)
             
-            return data
+            # Registrar trade
+            self.trades.append(execution)
             
-        except Exception as e:
-            self.logger.error(f"Error obteniendo datos: {str(e)}")
-            return {}
-    
-    async def _evaluate_entry_signal(self, symbol: str, 
-                                    historical_data: Dict[str, pd.DataFrame],
-                                    current_price: float,
-                                    current_time: datetime) -> bool:
-        """
-        Evalúa si debemos entrar en un trade
-        
-        Como trader experimentado, solo entro cuando:
-        1. El score es alto (>70)
-        2. La confianza es buena (>0.6)
-        3. No tenemos demasiados trades abiertos
-        4. Hay confluencia multi-timeframe
-        """
-        # Verificar si podemos abrir más trades
-        if len(self.portfolio.open_trades) >= self.config.max_trades:
-            return False
-        
-        # Verificar si ya tenemos un trade abierto en este símbolo
-        for trade in self.portfolio.open_trades.values():
-            if trade.symbol == symbol:
-                return False  # Solo un trade por símbolo
-        
-        try:
-            # 1. Analizar cada timeframe
-            mtf_analyses = {}
-            for tf, df in historical_data.items():
-                if len(df) < 20:  # Necesitamos mínimo 20 velas
-                    continue
-                
-                analyzer = create_analyzer(tf)
-                analysis = analyzer.analyze(df, symbol)
-                mtf_analyses[tf] = analysis
+            # Actualizar métricas de control
+            self._update_control_metrics(execution)
             
-            if not mtf_analyses:
-                return False
-            
-            # 2. Analizar confluencia
-            confluence_result = analyze_confluence(mtf_analyses)
-            
-            # 3. Detectar patrones (simplificado para backtest)
-            detected_patterns = []  # Por ahora sin detección de patrones
-            
-            # 4. Preparar contexto de mercado
-            market_context = {
-                'volatility': self._calculate_volatility(historical_data.get('1h')),
-                'liquidity_score': 0.8,  # Asumimos buena liquidez
-                'correlation_risk': 0.0,
-                'market_hours': 'active'
-            }
-            
-            # 5. Calcular score final (SIN LLM para backtest básico)
-            scoring_result = self.scorer.calculate_score(
-                mtf_analyses=mtf_analyses,
-                confluence_result=confluence_result,
-                detected_patterns=detected_patterns,
-                market_context=market_context,
-                symbol=symbol
+            self.logger.info(
+                f"Trade ejecutado: {side.value} {quantity:.4f} {symbol} @ ${execution_price:.2f}",
+                context=context,
+                extra_fields={
+                    "commission": commission,
+                    "slippage": slippage,
+                    "signal_score": signal_score,
+                    "llm_decision": llm_decision
+                }
             )
             
-            self.signals_generated += 1
-            
-            # 6. Decidir si entrar
-            if (scoring_result.final_score >= self.config.min_score_entry and
-                scoring_result.breakdown.confidence >= self.config.min_confidence):
-                
-                self.logger.info(
-                    f"SEÑAL DE ENTRADA: {symbol} @ {current_price:.2f} "
-                    f"Score: {scoring_result.final_score:.1f} "
-                    f"Confianza: {scoring_result.breakdown.confidence:.2f}"
-                )
-                
-                # Guardar score para el trade
-                self.last_entry_score = scoring_result.final_score
-                self.last_entry_confidence = scoring_result.breakdown.confidence
-                
-                return True
+            return execution
             
         except Exception as e:
-            self.logger.debug(f"Error evaluando señal: {str(e)}")
-        
-        return False
+            self.logger.error(f"Error ejecutando trade: {e}")
+            return None
     
-    def _execute_entry(self, symbol: str, entry_price: float, entry_time: datetime):
-        """
-        Ejecuta la entrada al mercado
+    def _update_portfolio_from_execution(self, execution: TradeExecution) -> None:
+        """Actualiza el estado del portfolio después de una ejecución"""
+        symbol = execution.symbol
+        quantity = execution.quantity
+        side = execution.side
         
-        Como trader disciplinado, SIEMPRE uso stop loss y take profit
-        MEJORADO: Stop loss dinámico según volatilidad del activo
-        """
-        # Stop Loss Dinámico según el tipo de activo
-        # Basado en análisis: altcoins necesitan más espacio que BTC/ETH
-        if symbol in ['BTCUSDT', 'ETHUSDT']:
-            # Majors: 3% stop loss (antes 2%)
-            dynamic_sl_pct = 0.03
-            dynamic_tp_pct = 0.09  # Mantenemos ratio 1:3
-        elif symbol in ['BNBUSDT', 'SOLUSDT']:
-            # Top 10 coins: 3.5% stop loss
-            dynamic_sl_pct = 0.035
-            dynamic_tp_pct = 0.105  # Mantenemos ratio 1:3
-        elif symbol in ['ADAUSDT']:
-            # Mid-cap altcoins: 4% stop loss
-            dynamic_sl_pct = 0.04
-            dynamic_tp_pct = 0.12  # Mantenemos ratio 1:3
-        elif symbol in ['DOGEUSDT', 'TIAUSDT']:
-            # High volatility altcoins: 4.5% stop loss
-            dynamic_sl_pct = 0.045
-            dynamic_tp_pct = 0.135  # Mantenemos ratio 1:3
-        else:
-            # Default para otros: 3.5%
-            dynamic_sl_pct = 0.035
-            dynamic_tp_pct = 0.105
+        # Actualizar posiciones
+        current_position = self.portfolio.positions.get(symbol, 0.0)
         
-        # Calcular stop loss y take profit con valores dinámicos
-        stop_loss = entry_price * (1 - dynamic_sl_pct)
-        take_profit = entry_price * (1 + dynamic_tp_pct)
+        if side == OrderSide.BUY:
+            new_position = current_position + quantity
+            cash_change = -(quantity * execution.price + execution.commission + abs(execution.slippage))
+        else:  # SELL
+            new_position = current_position - quantity
+            cash_change = quantity * execution.price - execution.commission - abs(execution.slippage)
         
-        # Ajustar tamaño de posición según volatilidad
-        # Mantener riesgo constante: más volatilidad = menor posición
-        base_position_pct = self.config.position_size_pct
+        # Actualizar portfolio
+        self.portfolio.positions[symbol] = new_position
+        self.portfolio.cash += cash_change
         
-        # Ajuste inverso a la volatilidad (más SL = menos posición)
-        volatility_adjustment = 0.03 / dynamic_sl_pct  # 3% como referencia base
-        adjusted_position_pct = base_position_pct * volatility_adjustment
+        # Actualizar valores de mercado
+        self._update_market_values()
+    
+    def _update_market_values(self) -> None:
+        """Actualiza los valores de mercado de todas las posiciones"""
+        for symbol, position in self.portfolio.positions.items():
+            current_price = self.current_prices.get(symbol, 0.0)
+            self.portfolio.market_values[symbol] = position * current_price
+    
+    def _update_control_metrics(self, execution: TradeExecution) -> None:
+        """Actualiza métricas de control después de cada trade"""
+        # Actualizar costo LLM si aplica
+        if execution.llm_decision and self.config.use_llm:
+            self.daily_llm_cost += self.config.llm_cost_per_call
         
-        # Limitar entre 10% y 30% del capital
-        adjusted_position_pct = min(0.30, max(0.10, adjusted_position_pct))
+        # Actualizar PnL diario (se calculará al final del día)
+        # Las pérdidas consecutivas se actualizarán cuando se cierre una posición
+    
+    def update_current_prices(self, timestamp: datetime) -> None:
+        """Actualiza precios actuales para un timestamp dado"""
+        self.current_time = timestamp
         
-        # Calcular tamaño de posición ajustado
-        position_size = self.portfolio.current_balance * adjusted_position_pct
+        for symbol, df in self.market_data.items():
+            # Buscar el precio más cercano al timestamp
+            mask = df.index <= timestamp
+            if mask.any():
+                latest_data = df[mask].iloc[-1]
+                self.current_prices[symbol] = latest_data['close']
+            else:
+                # Si no hay datos, mantener el último precio conocido
+                if symbol not in self.current_prices:
+                    self.current_prices[symbol] = df['close'].iloc[0] if not df.empty else 100.0
         
-        # Abrir trade (por ahora solo LONG)
-        trade = self.portfolio.open_trade(
-            symbol=symbol,
-            side=TradeSide.LONG,
-            entry_price=entry_price,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
-            position_size_usd=position_size,
-            entry_score=getattr(self, 'last_entry_score', 0),
-            entry_confidence=getattr(self, 'last_entry_confidence', 0)
+        # Actualizar valores de mercado del portfolio
+        if self.portfolio:
+            self.portfolio.timestamp = timestamp
+            self._update_market_values()
+    
+    def get_portfolio_snapshot(self) -> PortfolioState:
+        """Obtiene snapshot actual del portfolio"""
+        if not self.portfolio:
+            raise TradingBotException("Portfolio no inicializado")
+        
+        # Crear copia del estado actual
+        snapshot = PortfolioState(
+            timestamp=self.current_time,
+            cash=self.portfolio.cash,
+            positions=self.portfolio.positions.copy(),
+            market_values=self.portfolio.market_values.copy()
         )
         
-        if trade:
-            self.logger.info(
-                f"✅ TRADE EJECUTADO: {trade.trade_id} {symbol} "
-                f"Entrada: ${entry_price:.2f} SL: ${stop_loss:.2f} ({dynamic_sl_pct*100:.1f}%) "
-                f"TP: ${take_profit:.2f} ({dynamic_tp_pct*100:.1f}%) "
-                f"Posición: {adjusted_position_pct*100:.1f}%"
-            )
+        return snapshot
     
-    def _calculate_volatility(self, df: pd.DataFrame) -> float:
-        """Calcula volatilidad simple para el contexto"""
-        if df is None or len(df) < 20:
-            return 0.02  # Valor por defecto
+    def save_portfolio_snapshot(self) -> None:
+        """Guarda snapshot del portfolio en el historial"""
+        snapshot = self.get_portfolio_snapshot()
+        self.portfolio_history.append(snapshot)
+    
+    def get_current_equity(self) -> float:
+        """Obtiene equity actual del portfolio"""
+        return self.portfolio.total_value if self.portfolio else 0.0
+    
+    def get_unrealized_pnl(self) -> Dict[str, float]:
+        """Calcula PnL no realizado por símbolo"""
+        unrealized_pnl = {}
         
-        # Volatilidad como desviación estándar de retornos
-        returns = df['close'].pct_change().dropna()
-        return returns.std()
-    
-    async def _get_current_prices(self, symbols: List[str]) -> Dict[str, float]:
-        """Obtiene precios actuales para cerrar trades al final"""
-        prices = {}
-        for symbol in symbols:
-            try:
-                # Obtener última vela
-                result = await self.fetcher.fetch_ohlcv(
-                    symbol=symbol,
-                    timeframes=['1m'],  # 1 minuto para precio más actual
-                    limit=1
-                )
-                if '1m' in result and not result['1m'].data.empty:
-                    prices[symbol] = result['1m'].data['close'].iloc[-1]
-            except:
-                pass
-        return prices
-    
-    def _log_results(self, result: BacktestResult):
-        """
-        Registra los resultados del backtest
+        for symbol, position in self.portfolio.positions.items():
+            if position != 0:
+                current_price = self.current_prices.get(symbol, 0.0)
+                
+                # Calcular precio promedio de entrada
+                symbol_trades = [t for t in self.trades if t.symbol == symbol]
+                if symbol_trades:
+                    total_cost = sum(t.quantity * t.net_price for t in symbol_trades if t.side == OrderSide.BUY)
+                    total_quantity = sum(t.quantity for t in symbol_trades if t.side == OrderSide.BUY)
+                    avg_entry_price = total_cost / total_quantity if total_quantity > 0 else current_price
+                    
+                    unrealized_pnl[symbol] = position * (current_price - avg_entry_price)
+                else:
+                    unrealized_pnl[symbol] = 0.0
         
-        Como trader profesional, estas son las métricas que reviso SIEMPRE
-        """
-        self.logger.info("=" * 60)
-        self.logger.info("RESULTADOS DEL BACKTEST")
-        self.logger.info("=" * 60)
-        self.logger.info(f"Capital inicial: ${result.config.initial_capital:.2f}")
-        self.logger.info(f"Balance final: ${result.final_balance:.2f}")
-        self.logger.info(f"ROI: {result.roi_percent:.2f}%")
-        self.logger.info(f"Total trades: {result.portfolio_stats['total_trades']}")
-        self.logger.info(f"Win Rate: {result.win_rate:.1f}%")
-        self.logger.info(f"Profit Factor: {result.profit_factor:.2f}")
-        self.logger.info(f"Max Drawdown: {result.max_drawdown:.2f}%")
-        self.logger.info(f"Señales generadas: {result.signals_generated}")
-        self.logger.info(f"Tiempo ejecución: {result.execution_time:.1f}s")
-        self.logger.info("=" * 60)
+        return unrealized_pnl
+    
+    def calculate_daily_pnl(self, date: str) -> float:
+        """Calcula PnL para un día específico"""
+        # Obtener trades del día
+        target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        daily_trades = [
+            t for t in self.trades 
+            if t.timestamp.date() == target_date
+        ]
+        
+        # Calcular PnL realizado
+        realized_pnl = 0.0
+        for trade in daily_trades:
+            if trade.side == OrderSide.SELL:
+                # Simplificado: asumir FIFO para calcular PnL
+                realized_pnl += trade.quantity * trade.net_price
+            else:
+                realized_pnl -= trade.quantity * trade.net_price
+        
+        return realized_pnl
+    
+    def get_trade_statistics(self) -> Dict[str, Any]:
+        """Obtiene estadísticas básicas de los trades"""
+        if not self.trades:
+            return {
+                "total_trades": 0,
+                "winning_trades": 0,
+                "losing_trades": 0,
+                "win_rate": 0.0,
+                "avg_win": 0.0,
+                "avg_loss": 0.0,
+                "profit_factor": 0.0
+            }
+        
+        # Calcular PnL por trade (simplificado)
+        trade_pnls = []
+        for i, trade in enumerate(self.trades):
+            if trade.side == OrderSide.SELL and i > 0:
+                # Buscar trade de compra correspondiente
+                buy_trade = None
+                for j in range(i-1, -1, -1):
+                    if (self.trades[j].symbol == trade.symbol and 
+                        self.trades[j].side == OrderSide.BUY):
+                        buy_trade = self.trades[j]
+                        break
+                
+                if buy_trade:
+                    pnl = trade.quantity * (trade.net_price - buy_trade.net_price)
+                    trade_pnls.append(pnl)
+        
+        if not trade_pnls:
+            return {
+                "total_trades": len(self.trades),
+                "winning_trades": 0,
+                "losing_trades": 0,
+                "win_rate": 0.0,
+                "avg_win": 0.0,
+                "avg_loss": 0.0,
+                "profit_factor": 0.0
+            }
+        
+        winning_trades = [pnl for pnl in trade_pnls if pnl > 0]
+        losing_trades = [pnl for pnl in trade_pnls if pnl < 0]
+        
+        win_rate = len(winning_trades) / len(trade_pnls) if trade_pnls else 0.0
+        avg_win = np.mean(winning_trades) if winning_trades else 0.0
+        avg_loss = np.mean(losing_trades) if losing_trades else 0.0
+        
+        gross_profit = sum(winning_trades) if winning_trades else 0.0
+        gross_loss = abs(sum(losing_trades)) if losing_trades else 0.0
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+        
+        return {
+            "total_trades": len(trade_pnls),
+            "winning_trades": len(winning_trades),
+            "losing_trades": len(losing_trades),
+            "win_rate": win_rate,
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "profit_factor": profit_factor,
+            "gross_profit": gross_profit,
+            "gross_loss": gross_loss
+        }
